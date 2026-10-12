@@ -1,7 +1,6 @@
 const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const http = require('http');
-const fs = require('fs');
-const path = require('path');
+const mongoose = require('mongoose');
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages] });
 
@@ -13,22 +12,29 @@ const GUILD_ID = '1559002627285590026';
 
 let lastVideoId = null;
 
-// Sistema de salvamento em arquivo para as obras e histórico de progresso
-const DATA_FILE = path.join(__dirname, 'obras.json');
-let db = { obras: {}, historico: {} };
+// --- MODELOS DO MONGODB ---
+const obraSchema = new mongoose.Schema({
+  key: { type: String, required: true, unique: true }, // nome em minúsculas
+  nomeOriginal: { type: String, required: true },
+  imagem: { type: String, required: true },
+  cor: { type: String, required: true }
+});
 
-if (fs.existsSync(DATA_FILE)) {
-  try {
-    db = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-    if (!db.obras) db = { obras: db, historico: {} }; // Compatibilidade com formato antigo
-  } catch (e) {
-    db = { obras: {}, historico: {} };
-  }
-}
+const historicoSchema = new mongoose.Schema({
+  key: { type: String, required: true, unique: true }, // formato: obraKey_ep_NUMERO
+  tl: { type: String, default: 'pending' },
+  ed: { type: String, default: 'pending' },
+  ts: { type: String, default: 'pending' },
+  qc: { type: String, default: 'pending' }
+});
 
-function salvarDB() {
-  fs.writeFileSync(DATA_FILE, JSON.stringify(db, null, 2));
-}
+const Obra = mongoose.model('Obra', obraSchema);
+const Historico = mongoose.model('Historico', historicoSchema);
+
+// --- CONEXÃO AO MONGODB ---
+mongoose.connect(process.env.MONGODB_URI)
+  .then(() => console.log('Conectado ao MongoDB com sucesso!'))
+  .catch(err => console.error('Erro ao conectar ao MongoDB:', err));
 
 // 1. Definição dos comandos de barra (/cadastrar-obra e /progresso)
 const commands = [
@@ -125,7 +131,7 @@ async function checkYouTubeChannel() {
   }
 }
 
-// Nomes bonitos para as etapas
+// Nomes formatados para exibição das etapas
 const nomesEtapas = {
   tl: 'TL (Tradução)',
   ed: 'ED (Edição)',
@@ -148,14 +154,16 @@ client.on('interactionCreate', async interaction => {
       return interaction.reply({ content: '❌ Cor inválida! Use o formato hexadecimal correto (Ex: `#FF0000` ou `FF0000`).', ephemeral: true });
     }
 
-    db.obras[nome.toLowerCase()] = {
-      nomeOriginal: nome,
-      imagem: imagem,
-      cor: cleanHex
-    };
-    salvarDB();
+    const key = nome.toLowerCase();
 
-    return interaction.reply({ content: `✅ Obra **"${nome}"** cadastrada com sucesso!`, ephemeral: true });
+    // Salva ou atualiza no MongoDB
+    await Obra.findOneAndUpdate(
+      { key },
+      { key, nomeOriginal: nome, imagem, cor: cleanHex },
+      { upsert: true, new: true }
+    );
+
+    return interaction.reply({ content: `✅ Obra **"${nome}"** cadastrada com sucesso no banco de dados!`, ephemeral: true });
   }
 
   // Comando /progresso
@@ -171,11 +179,16 @@ client.on('interactionCreate', async interaction => {
       qc: interaction.options.getString('qc')
     };
 
-    // Chave única para identificar a obra e o episódio no histórico
-    const chaveHistorico = `${nomeObraInput.toLowerCase()}_ep_${ep}`;
-    const ultimoEstado = db.historico[chaveHistorico] || { tl: 'pending', ed: 'pending', ts: 'pending', qc: 'pending' };
+    const obraKey = nomeObraInput.toLowerCase();
+    const chaveHistorico = `${obraKey}_ep_${ep}`;
 
-    // Descobrir qual etapa mudou de 'pending' para 'done' em relação à última atualização
+    // Buscar estado anterior do episódio no MongoDB
+    let ultimoEstado = await Historico.findOne({ key: chaveHistorico });
+    if (!ultimoEstado) {
+      ultimoEstado = { tl: 'pending', ed: 'pending', ts: 'pending', qc: 'pending' };
+    }
+
+    // Identificar qual etapa mudou de 'pending' para 'done'
     let etapaConcluidaRecente = null;
     for (const [etapa, val] of Object.entries(statusAtuais)) {
       if (val === 'done' && ultimoEstado[etapa] === 'pending') {
@@ -184,44 +197,39 @@ client.on('interactionCreate', async interaction => {
       }
     }
 
-    if (!etapaConcluidaRecente) {
-      for (const [etapa, val] of Object.entries(statusAtuais)) {
-        if (val === 'done') {
-          etapaConcluidaRecente = nomesEtapas[etapa];
-          break;
-        }
-      }
-    }
-
-    const textoCheck = etapaConcluidaRecente ? `✅ **${etapaConcluidaRecente}**` : `✅ **Atualização de Progresso**`;
-
-    // Atualiza o histórico no banco de dados com o estado atual
-    db.historico[chaveHistorico] = { ...statusAtuais };
-    salvarDB();
+    // Salvar novo estado no MongoDB
+    await Historico.findOneAndUpdate(
+      { key: chaveHistorico },
+      { key: chaveHistorico, ...statusAtuais },
+      { upsert: true, new: true }
+    );
 
     const tlStatus = statusAtuais.tl === 'done' ? '~~TL~~' : '**TL**';
     const edStatus = statusAtuais.ed === 'done' ? '~~ED~~' : '**ED**';
     const tsStatus = statusAtuais.ts === 'done' ? '~~TS~~' : '**TS**';
     const qcStatus = statusAtuais.qc === 'done' ? '~~QC~~' : '**QC**';
 
-    // Buscar dados cadastrados da obra
-    const obraKey = nomeObraInput.toLowerCase();
-    const obraCadastrada = db.obras[obraKey];
+    // Buscar a obra cadastrada no MongoDB
+    const obraCadastrada = await Obra.findOne({ key: obraKey });
 
     const nomeExibicao = obraCadastrada ? obraCadastrada.nomeOriginal : nomeObraInput;
     const imagemObra = obraCadastrada ? obraCadastrada.imagem : null;
     const corObra = obraCadastrada ? parseInt(obraCadastrada.cor, 16) : 0x00AE86;
 
-    // Descrição principal contendo apenas o Nome e o Episódio com porcentagem
-    const descricao = `## ${nomeExibicao}\n### Episódio ${ep} - ${porcentagem}%`;
+    // Título da obra com # e sem quebras de linha adicionais
+    const descricao = `# ${nomeExibicao}\n### Episódio ${ep} - ${porcentagem}%`;
 
-    // Valor do Field combinando a última etapa e as etapas formatadas
-    const fieldValor = `${textoCheck}\n\n${tlStatus}  ${edStatus}  ${tsStatus}  ${qcStatus}`;
+    // Montar o valor do Field
+    let fieldValor = '';
+    if (etapaConcluidaRecente) {
+      fieldValor += `✅ **${etapaConcluidaRecente}**\n\n`;
+    }
+    fieldValor += `${tlStatus}  ${edStatus}  ${tsStatus}  ${qcStatus}`;
 
     const embed = new EmbedBuilder()
       .setColor(corObra)
       .setDescription(descricao)
-      .addFields({ name: '\u200b', value: fieldValor }) // Field customizado
+      .addFields({ name: '\u200b', value: fieldValor })
       .setTimestamp();
 
     if (imagemObra) {
