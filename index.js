@@ -14,14 +14,14 @@ let lastVideoId = null;
 
 // --- MODELOS DO MONGODB ---
 const obraSchema = new mongoose.Schema({
-  key: { type: String, required: true, unique: true }, // nome em minúsculas
+  key: { type: String, required: true, unique: true },
   nomeOriginal: { type: String, required: true },
   imagem: { type: String, required: true },
   cor: { type: String, required: true }
 });
 
 const historicoSchema = new mongoose.Schema({
-  key: { type: String, required: true, unique: true }, // formato: obraKey_ep_NUMERO
+  key: { type: String, required: true, unique: true },
   tl: { type: String, default: 'pending' },
   ed: { type: String, default: 'pending' },
   ts: { type: String, default: 'pending' },
@@ -156,7 +156,6 @@ client.on('interactionCreate', async interaction => {
 
     const key = nome.toLowerCase();
 
-    // Salva ou atualiza no MongoDB
     await Obra.findOneAndUpdate(
       { key },
       { key, nomeOriginal: nome, imagem, cor: cleanHex },
@@ -182,13 +181,11 @@ client.on('interactionCreate', async interaction => {
     const obraKey = nomeObraInput.toLowerCase();
     const chaveHistorico = `${obraKey}_ep_${ep}`;
 
-    // Buscar estado anterior do episódio no MongoDB
     let ultimoEstado = await Historico.findOne({ key: chaveHistorico });
     if (!ultimoEstado) {
       ultimoEstado = { tl: 'pending', ed: 'pending', ts: 'pending', qc: 'pending' };
     }
 
-    // Identificar qual etapa mudou de 'pending' para 'done'
     let etapaConcluidaRecente = null;
     for (const [etapa, val] of Object.entries(statusAtuais)) {
       if (val === 'done' && ultimoEstado[etapa] === 'pending') {
@@ -197,7 +194,6 @@ client.on('interactionCreate', async interaction => {
       }
     }
 
-    // Salvar novo estado no MongoDB
     await Historico.findOneAndUpdate(
       { key: chaveHistorico },
       { key: chaveHistorico, ...statusAtuais },
@@ -209,20 +205,18 @@ client.on('interactionCreate', async interaction => {
     const tsStatus = statusAtuais.ts === 'done' ? '~~TS~~' : '**TS**';
     const qcStatus = statusAtuais.qc === 'done' ? '~~QC~~' : '**QC**';
 
-    // Buscar a obra cadastrada no MongoDB
     const obraCadastrada = await Obra.findOne({ key: obraKey });
 
     const nomeExibicao = obraCadastrada ? obraCadastrada.nomeOriginal : nomeObraInput;
     const imagemObra = obraCadastrada ? obraCadastrada.imagem : null;
     const corObra = obraCadastrada ? parseInt(obraCadastrada.cor, 16) : 0x00AE86;
 
-    // Título da obra com # e sem quebras de linha adicionais
     const descricao = `# ${nomeExibicao}\n### Episódio ${ep} - ${porcentagem}%`;
 
-    // Montar o valor do Field
+    // Montar o valor do Field coladinho (com apenas uma quebra simples se houver check)
     let fieldValor = '';
     if (etapaConcluidaRecente) {
-      fieldValor += `✅ **${etapaConcluidaRecente}**\n\n`;
+      fieldValor += `✅ **${etapaConcluidaRecente}**\n`;
     }
     fieldValor += `${tlStatus}  ${edStatus}  ${tsStatus}  ${qcStatus}`;
 
