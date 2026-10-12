@@ -7,8 +7,6 @@ const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBit
 // --- CONFIGURAÇÕES DISCORD ---
 const GUILD_ID = '1559002627285590026';  
 
-let lastVideoId = null;
-
 // --- MODELOS DO MONGODB ---
 const obraSchema = new mongoose.Schema({
   key: { type: String, required: true, unique: true },
