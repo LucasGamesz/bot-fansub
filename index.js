@@ -13,20 +13,21 @@ const GUILD_ID = '1559002627285590026';
 
 let lastVideoId = null;
 
-// Sistema simples de salvamento em arquivo para as obras cadastradas
+// Sistema de salvamento em arquivo para as obras e histórico de progresso
 const DATA_FILE = path.join(__dirname, 'obras.json');
-let obrasDB = {};
+let db = { obras: {}, historico: {} };
 
 if (fs.existsSync(DATA_FILE)) {
   try {
-    obrasDB = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+    db = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+    if (!db.obras) db = { obras: db, historico: {} }; // Compatibilidade com formato antigo
   } catch (e) {
-    obrasDB = {};
+    db = { obras: {}, historico: {} };
   }
 }
 
-function salvarObras() {
-  fs.writeFileSync(DATA_FILE, JSON.stringify(obrasDB, null, 2));
+function salvarDB() {
+  fs.writeFileSync(DATA_FILE, JSON.stringify(db, null, 2));
 }
 
 // 1. Definição dos comandos de barra (/cadastrar-obra e /progresso)
@@ -71,8 +72,9 @@ client.once('ready', async () => {
   
   const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
   try {
+    await rest.put(Routes.applicationCommands(client.user.id), { body: [] });
     await rest.put(Routes.applicationGuildCommands(client.user.id, GUILD_ID), { body: commands });
-    console.log('Comandos de barra registrados no servidor!');
+    console.log('Comandos de barra limpos e registrados com sucesso!');
   } catch (error) {
     console.error('Erro ao registrar comandos:', error);
   }
@@ -123,7 +125,15 @@ async function checkYouTubeChannel() {
   }
 }
 
-// 2. Manipulador das interações (Comandos)
+// Nomes bonitos para as etapas
+const nomesEtapas = {
+  tl: 'TL (Tradução)',
+  ed: 'ED (Edição)',
+  ts: 'TS (Typesetting)',
+  qc: 'QC (Revisão)'
+};
+
+// Manipulador das interações (Comandos)
 client.on('interactionCreate', async interaction => {
   if (!interaction.isChatInputCommand()) return;
 
@@ -138,14 +148,14 @@ client.on('interactionCreate', async interaction => {
       return interaction.reply({ content: '❌ Cor inválida! Use o formato hexadecimal correto (Ex: `#FF0000` ou `FF0000`).', ephemeral: true });
     }
 
-    obrasDB[nome.toLowerCase()] = {
+    db.obras[nome.toLowerCase()] = {
       nomeOriginal: nome,
       imagem: imagem,
       cor: cleanHex
     };
-    salvarObras();
+    salvarDB();
 
-    return interaction.reply({ content: `✅ Obra **"${nome}"** cadastrada com sucesso! Agora já pode usar no comando /progresso.`, ephemeral: true });
+    return interaction.reply({ content: `✅ Obra **"${nome}"** cadastrada com sucesso!`, ephemeral: true });
   }
 
   // Comando /progresso
@@ -154,33 +164,56 @@ client.on('interactionCreate', async interaction => {
     const ep = interaction.options.getInteger('episodio');
     const porcentagem = interaction.options.getInteger('porcentagem');
 
-    const tlVal = interaction.options.getString('tl');
-    const edVal = interaction.options.getString('ed');
-    const tsVal = interaction.options.getString('ts');
-    const qcVal = interaction.options.getString('qc');
+    const statusAtuais = {
+      tl: interaction.options.getString('tl'),
+      ed: interaction.options.getString('ed'),
+      ts: interaction.options.getString('ts'),
+      qc: interaction.options.getString('qc')
+    };
 
-    const tlStatus = tlVal === 'done' ? '~~TL~~' : '**TL**';
-    const edStatus = edVal === 'done' ? '~~ED~~' : '**ED**';
-    const tsStatus = tsVal === 'done' ? '~~TS~~' : '**TS**';
-    const qcStatus = qcVal === 'done' ? '~~QC~~' : '**QC**';
+    // Chave única para identificar a obra e o episódio no histórico
+    const chaveHistorico = `${nomeObraInput.toLowerCase()}_ep_${ep}`;
+    const ultimoEstado = db.historico[chaveHistorico] || { tl: 'pending', ed: 'pending', ts: 'pending', qc: 'pending' };
 
-    // Descobrir última etapa concluída
-    let ultimaConcluida = 'Nenhuma ainda';
-    if (qcVal === 'done') ultimaConcluida = 'QC (Revisão)';
-    else if (tsVal === 'done') ultimaConcluida = 'TS (Typesetting)';
-    else if (edVal === 'done') ultimaConcluida = 'ED (Edição)';
-    else if (tlVal === 'done') ultimaConcluida = 'TL (Tradução)';
+    // Descobrir qual etapa mudou de 'pending' para 'done' em relação à última atualização
+    let etapaConcluidaRecente = null;
+    for (const [etapa, val] of Object.entries(statusAtuais)) {
+      if (val === 'done' && ultimoEstado[etapa] === 'pending') {
+        etapaConcluidaRecente = nomesEtapas[etapa];
+        break;
+      }
+    }
 
-    // Buscar dados cadastrados da obra (se não encontrar, usa padrão)
+    // Se nenhuma mudou mas alguma está feita, pega a primeira feita ou mantém um padrão
+    if (!etapaConcluidaRecente) {
+      for (const [etapa, val] of Object.entries(statusAtuais)) {
+        if (val === 'done') {
+          etapaConcluidaRecente = nomesEtapas[etapa];
+          break;
+        }
+      }
+    }
+
+    const textoCheck = etapaConcluidaRecente ? `✅ **${etapaConcluidaRecente}**` : `✅ **Atualização de Progresso**`;
+
+    // Atualiza o histórico no banco de dados com o estado atual
+    db.historico[chaveHistorico] = { ...statusAtuais };
+    salvarDB();
+
+    const tlStatus = statusAtuais.tl === 'done' ? '~~TL~~' : '**TL**';
+    const edStatus = statusAtuais.ed === 'done' ? '~~ED~~' : '**ED**';
+    const tsStatus = statusAtuais.ts === 'done' ? '~~TS~~' : '**TS**';
+    const qcStatus = statusAtuais.qc === 'done' ? '~~QC~~' : '**QC**';
+
+    // Buscar dados cadastrados da obra
     const obraKey = nomeObraInput.toLowerCase();
-    const obraCadastrada = obrasDB[obraKey];
+    const obraCadastrada = db.obras[obraKey];
 
     const nomeExibicao = obraCadastrada ? obraCadastrada.nomeOriginal : nomeObraInput;
     const imagemObra = obraCadastrada ? obraCadastrada.imagem : null;
     const corObra = obraCadastrada ? parseInt(obraCadastrada.cor, 16) : 0x00AE86;
 
-    // Ajustado com o pulo de linha (\n) após o episódio/porcentagem e sem o texto fixo
-    const descricao = `## ${nomeExibicao}\n### Episódio ${ep} - ${porcentagem}%\n\n✅ **${ultimaConcluida}**\n\n${tlStatus}  ${edStatus}  ${tsStatus}  ${qcStatus}`;
+    const descricao = `## ${nomeExibicao}\n### Episódio ${ep} - ${porcentagem}%\n\n${textoCheck}\n\n${tlStatus}  ${edStatus}  ${tsStatus}  ${qcStatus}`;
 
     const embed = new EmbedBuilder()
       .setColor(corObra)
