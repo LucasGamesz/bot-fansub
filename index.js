@@ -3,10 +3,13 @@ const http = require('http');
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages] });
 
-// --- CONFIGURAÇÕES DO YOUTUBE ---
+// --- CONFIGURAÇÕES DO YOUTUBE E DISCORD ---
 const YOUTUBE_CHANNEL_ID = 'UCtmm6eThoXGDYuelQBWphoA';
 const TRAILERS_CHANNEL_ID = '1559006817470910464';
 const ANISONGS_CHANNEL_ID = '1559006593084035242';
+
+// Insira aqui o ID do seu servidor do Discord para o comando aparecer instantaneamente:
+const GUILD_ID = 'COLOQUE_O_ID_DO_SEU_SERVIDOR_AQUI'; 
 
 let lastVideoId = null;
 
@@ -38,8 +41,9 @@ client.once('ready', async () => {
   
   const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
   try {
-    await rest.put(Routes.applicationCommands(client.user.id), { body: commands });
-    console.log('Comandos de barra registrados!');
+    // Registra o comando especificamente no servidor (Guild) para aparecer na hora
+    await rest.put(Routes.applicationGuildCommands(client.user.id, GUILD_ID), { body: commands });
+    console.log('Comandos de barra registrados no servidor!');
   } catch (error) {
     console.error('Erro ao registrar comandos:', error);
   }
