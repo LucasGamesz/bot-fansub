@@ -6,6 +6,7 @@ const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBit
 
 // --- CONFIGURAÇÕES DISCORD ---
 const GUILD_ID = '1559002627285590026';  
+const PROGRESSO_CHANNEL_ID = 'SEU_ID_DO_CANAL_DE_PROGRESSO_AQUI'; // Substitua pelo ID do canal onde o embed será enviado
 
 // --- MODELOS DO MONGODB ---
 const obraSchema = new mongoose.Schema({
@@ -161,13 +162,13 @@ client.on('interactionCreate', async interaction => {
     const imagemObra = obraCadastrada ? obraCadastrada.imagem : null;
     const corObra = obraCadastrada ? parseInt(obraCadastrada.cor, 16) : 0x00AE86;
 
-    // Construir a descrição ajustando o espaço para ficar acima do check e colado nas etapas
+    // Construir a descrição ajustando o espaço acima do check e colado nas etapas
     let descricao = `# ${nomeExibicao}\n### Episódio ${ep} - ${porcentagem}%`;
 
     if (etapaConcluidaRecente) {
       descricao += `\n\n✅ **${etapaConcluidaRecente}**\n${tlStatus}  ${edStatus}  ${tsStatus}  ${qcStatus}`;
     } else {
-      descricao += `\n\nStatus do episódio ${ep}\n${tlStatus}  ${edStatus}  ${tsStatus}  ${qcStatus}`;
+      descricao += `\n\n${tlStatus}  ${edStatus}  ${tsStatus}  ${qcStatus}`;
     }
 
     const embed = new EmbedBuilder()
@@ -179,7 +180,14 @@ client.on('interactionCreate', async interaction => {
       embed.setThumbnail(imagemObra);
     }
 
-    await interaction.reply({ embeds: [embed] });
+    // Envia o embed de forma limpa no canal configurado e confirma para o usuário de forma privada
+    const canalProgresso = await client.channels.fetch(PROGRESSO_CHANNEL_ID);
+    if (canalProgresso) {
+      await canalProgresso.send({ embeds: [embed] });
+      await interaction.reply({ content: `✅ Progresso de **${nomeExibicao} (Ep. ${ep})** enviado com sucesso para o canal de progresso!`, ephemeral: true });
+    } else {
+      await interaction.reply({ content: '❌ Canal de progresso não encontrado. Verifique o ID configurado.', ephemeral: true });
+    }
   }
 });
 
