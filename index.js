@@ -162,7 +162,7 @@ client.on('interactionCreate', async interaction => {
     const corObra = obraCadastrada ? parseInt(obraCadastrada.cor, 16) : 0x00AE86;
 
     // Construir a descrição ajustando o espaço para ficar acima do check e colado nas etapas
-    let descricao = `# ${nomeExibicao}\n## Episódio ${ep} - ${porcentagem}%`;
+    let descricao = `# ${nomeExibicao}\n### Episódio ${ep} - ${porcentagem}%`;
 
     if (etapaConcluidaRecente) {
       descricao += `\n\n✅ **${etapaConcluidaRecente}**\n${tlStatus}  ${edStatus}  ${tsStatus}  ${qcStatus}`;
