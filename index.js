@@ -211,19 +211,18 @@ client.on('interactionCreate', async interaction => {
     const imagemObra = obraCadastrada ? obraCadastrada.imagem : null;
     const corObra = obraCadastrada ? parseInt(obraCadastrada.cor, 16) : 0x00AE86;
 
-    const descricao = `# ${nomeExibicao}\n### Episódio ${ep} - ${porcentagem}%`;
+    // Construir tudo diretamente na description para evitar espaçamento de fields
+    let descricao = `# ${nomeExibicao}\n### Episódio ${ep} - ${porcentagem}%\n`;
 
-    // Montar o valor do Field coladinho (com apenas uma quebra simples se houver check)
-    let fieldValor = '';
     if (etapaConcluidaRecente) {
-      fieldValor += `✅ **${etapaConcluidaRecente}**\n`;
+      descricao += `\n✅ **${etapaConcluidaRecente}**\n`;
     }
-    fieldValor += `${tlStatus}  ${edStatus}  ${tsStatus}  ${qcStatus}`;
+
+    descricao += `\n${tlStatus}  ${edStatus}  ${tsStatus}  ${qcStatus}`;
 
     const embed = new EmbedBuilder()
       .setColor(corObra)
       .setDescription(descricao)
-      .addFields({ name: '\u200b', value: fieldValor })
       .setTimestamp();
 
     if (imagemObra) {
