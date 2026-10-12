@@ -6,7 +6,7 @@ const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBit
 
 // --- CONFIGURAÇÕES DISCORD ---
 const GUILD_ID = '1559002627285590026';  
-const PROGRESSO_CHANNEL_ID = 'SEU_ID_DO_CANAL_DE_PROGRESSO_AQUI'; // Substitua pelo ID do canal
+const PROGRESSO_CHANNEL_ID = '1559007169188331540'; // Substitua pelo ID do canal
 
 // --- MODELOS DO MONGODB ---
 const obraSchema = new mongoose.Schema({
@@ -40,14 +40,13 @@ mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('Conectado ao MongoDB com sucesso!'))
   .catch(err => console.error('Erro ao conectar ao MongoDB:', err));
 
-// 1. Definição dos comandos de barra
+// 1. Definição dos comandos de barra (com os obrigatórios antes dos opcionais)
 const commands = [
   new SlashCommandBuilder()
     .setName('cadastrar-obra')
     .setDescription('Cadastra a obra e envia a ficha técnica completa no canal')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addStringOption(option => option.setName('titulo').setDescription('Título principal da obra').setRequired(true))
-    .addStringOption(option => option.setName('titulo_alternativo').setDescription('Título alternativo').setRequired(false))
     .addStringOption(option => option.setName('generos').setDescription('Gêneros (ex: Action, Sci-Fi)').setRequired(true))
     .addStringOption(option => option.setName('estudios').setDescription('Estúdios responsáveis').setRequired(true))
     .addStringOption(option => option.setName('temporada').setDescription('Temporada e Ano (ex: Primavera/2024)').setRequired(true))
@@ -56,7 +55,8 @@ const commands = [
     .addStringOption(option => option.setName('sinopse').setDescription('Sinopse da obra').setRequired(true))
     .addStringOption(option => option.setName('downloads').setDescription('Links de download').setRequired(true))
     .addStringOption(option => option.setName('cor').setDescription('Cor em Hex (Ex: #FF0000 ou FF0000)').setRequired(true))
-    .addStringOption(option => option.setName('imagem').setDescription('Link da imagem/capa').setRequired(true)),
+    .addStringOption(option => option.setName('imagem').setDescription('Link da imagem/capa').setRequired(true))
+    .addStringOption(option => option.setName('titulo_alternativo').setDescription('Título alternativo').setRequired(false)), // Opcional colocado no fim
 
   new SlashCommandBuilder()
     .setName('progresso')
@@ -108,7 +108,6 @@ client.on('interactionCreate', async interaction => {
   // --- /CADASTRAR-OBRA: Ficha técnica completa ---
   if (interaction.commandName === 'cadastrar-obra') {
     const titulo = interaction.options.getString('titulo');
-    const tituloAlternativo = interaction.options.getString('titulo_alternativo') || '';
     const generos = interaction.options.getString('generos');
     const estudios = interaction.options.getString('estudios');
     const temporada = interaction.options.getString('temporada');
@@ -118,6 +117,7 @@ client.on('interactionCreate', async interaction => {
     const downloads = interaction.options.getString('downloads');
     const corInput = interaction.options.getString('cor');
     const imagem = interaction.options.getString('imagem');
+    const tituloAlternativo = interaction.options.getString('titulo_alternativo') || '';
 
     const cleanHex = corInput.replace('#', '');
     if (!/^[0-9A-Fa-f]{6}$/.test(cleanHex)) {
