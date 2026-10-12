@@ -4,10 +4,7 @@ const mongoose = require('mongoose');
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages] });
 
-// --- CONFIGURAÇÕES DO YOUTUBE E DISCORD ---
-const YOUTUBE_CHANNEL_ID = 'UCtmm6eThoXGDYuelQBWphoA';
-const TRAILERS_CHANNEL_ID = '1559006817470910464';
-const ANISONGS_CHANNEL_ID = '1559006593084035242';
+// --- CONFIGURAÇÕES DISCORD ---
 const GUILD_ID = '1559002627285590026';  
 
 let lastVideoId = null;
@@ -84,52 +81,7 @@ client.once('ready', async () => {
   } catch (error) {
     console.error('Erro ao registrar comandos:', error);
   }
-
-  setInterval(checkYouTubeChannel, 300000);
-  checkYouTubeChannel();
 });
-
-// Função que verifica novos vídeos no YouTube
-async function checkYouTubeChannel() {
-  try {
-    const rssUrl = encodeURIComponent(`https://www.youtube.com/feeds/videos.xml?channel_id=${YOUTUBE_CHANNEL_ID}`);
-    const response = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${rssUrl}`);
-    const data = await response.json();
-
-    if (data.status !== 'ok' || !data.items || data.items.length === 0) return;
-
-    const latestVideo = data.items[0];
-    const videoId = latestVideo.guid || latestVideo.link;
-
-    if (lastVideoId === null) {
-      lastVideoId = videoId;
-      return;
-    }
-
-    if (videoId !== lastVideoId) {
-      lastVideoId = videoId;
-      const title = latestVideo.title;
-      const url = latestVideo.link;
-
-      const lowerTitle = title.toLowerCase();
-      const isTrailerOrTeaser = lowerTitle.includes('trailer') || lowerTitle.includes('teaser');
-
-      if (isTrailerOrTeaser) {
-        const channel = await client.channels.fetch(TRAILERS_CHANNEL_ID);
-        if (channel) {
-          await channel.send(`## 🎬 ${title}\n🔗 Link: ${url}\n\n<@&1559016026803540009>`);
-        }
-      } else {
-        const channel = await client.channels.fetch(ANISONGS_CHANNEL_ID);
-        if (channel) {
-          await channel.send(`## 🎵 ${title}\n🔗 Link: ${url}\n\n<@&1559015547914686636>`);
-        }
-      }
-    }
-  } catch (error) {
-    console.error('Erro ao buscar feed do YouTube:', error);
-  }
-}
 
 // Nomes formatados para exibição das etapas
 const nomesEtapas = {
@@ -212,7 +164,7 @@ client.on('interactionCreate', async interaction => {
     const corObra = obraCadastrada ? parseInt(obraCadastrada.cor, 16) : 0x00AE86;
 
     // Construir a descrição ajustando o espaço para ficar acima do check e colado nas etapas
-    let descricao = `# ${nomeExibicao}\n### Episódio ${ep} - ${porcentagem}%`;
+    let descricao = `# ${nomeExibicao}\n## Episódio ${ep} - ${porcentagem}%`;
 
     if (etapaConcluidaRecente) {
       descricao += `\n\n✅ **${etapaConcluidaRecente}**\n${tlStatus}  ${edStatus}  ${tsStatus}  ${qcStatus}`;
