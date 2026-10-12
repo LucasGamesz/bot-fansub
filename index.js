@@ -1,5 +1,6 @@
 const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const Parser = require('rss-parser');
+const http = require('http');
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages] });
 const parser = new Parser({
@@ -9,8 +10,7 @@ const parser = new Parser({
 });
 
 // --- CONFIGURAÇÕES DO YOUTUBE ---
-// Substitua pelas suas informações reais:
-const YOUTUBE_CHANNEL_ID = 'UCtmm6eThoXGDYuelQBWphoA'; // Ex: UCxxxxxxxxxxxxxxx
+const YOUTUBE_CHANNEL_ID = 'UCtmm6eThoXGDYuelQBWphoA';
 const TRAILERS_CHANNEL_ID = '1559006817470910464';
 const ANISONGS_CHANNEL_ID = '1559006593084035242';
 
@@ -55,14 +55,14 @@ client.once('ready', async () => {
   checkYouTubeChannel(); // Roda uma vez logo ao iniciar
 });
 
-// Função que verifica novos vídeos no YouTube (equivalente ao seu bloco do BotGhost)
+// Função que verifica novos vídeos no YouTube usando o Proxy do Piped
 async function checkYouTubeChannel() {
   try {
-    const feed = await parser.parseURL(`https://www.youtube.com/feeds/videos.xml?channel_id=${YOUTUBE_CHANNEL_ID}`);
+    const feed = await parser.parseURL(`https://pipedproxy.kavin.rocks/feed/rss/channel/${YOUTUBE_CHANNEL_ID}`);
     if (feed.items.length === 0) return;
 
     const latestVideo = feed.items[0];
-    const videoId = latestVideo.id.split(':')[2]; // Extrai o ID único do vídeo
+    const videoId = latestVideo.id.split(':')[2] || latestVideo.guid || latestVideo.link;
 
     // Na primeira leitura, apenas armazena para não spammar vídeos antigos ao ligar o bot
     if (lastVideoId === null) {
@@ -77,7 +77,6 @@ async function checkYouTubeChannel() {
       const url = latestVideo.link;
 
       const lowerTitle = title.toLowerCase();
-      // Equivalente às condições "Trailer" e "Teaser" do BotGhost
       const isTrailerOrTeaser = lowerTitle.includes('trailer') || lowerTitle.includes('teaser');
 
       if (isTrailerOrTeaser) {
@@ -121,6 +120,17 @@ client.on('interactionCreate', async interaction => {
 
     await interaction.reply({ embeds: [embed] });
   }
+});
+
+// --- MINI SERVIDOR HTTP PARA O RENDER NÃO DORMIR ---
+const server = http.createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/plain' });
+  res.end('Bot esta online e operando!\n');
+});
+
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`Servidor HTTP rodando na porta ${PORT}`);
 });
 
 client.login(process.env.TOKEN);
