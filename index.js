@@ -1,13 +1,7 @@
 const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const Parser = require('rss-parser');
 const http = require('http');
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages] });
-const parser = new Parser({
-  headers: {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-  }
-});
 
 // --- CONFIGURAÇÕES DO YOUTUBE ---
 const YOUTUBE_CHANNEL_ID = 'UCtmm6eThoXGDYuelQBWphoA';
@@ -55,14 +49,17 @@ client.once('ready', async () => {
   checkYouTubeChannel(); // Roda uma vez logo ao iniciar
 });
 
-// Função que verifica novos vídeos no YouTube usando o Proxy do Piped
+// Função que verifica novos vídeos no YouTube usando a API rss2json
 async function checkYouTubeChannel() {
   try {
-    const feed = await parser.parseURL(`https://pipedproxy.kavin.rocks/feed/rss/channel/${YOUTUBE_CHANNEL_ID}`);
-    if (feed.items.length === 0) return;
+    const rssUrl = encodeURIComponent(`https://www.youtube.com/feeds/videos.xml?channel_id=${YOUTUBE_CHANNEL_ID}`);
+    const response = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${rssUrl}`);
+    const data = await response.json();
 
-    const latestVideo = feed.items[0];
-    const videoId = latestVideo.id.split(':')[2] || latestVideo.guid || latestVideo.link;
+    if (data.status !== 'ok' || !data.items || data.items.length === 0) return;
+
+    const latestVideo = data.items[0];
+    const videoId = latestVideo.guid || latestVideo.link;
 
     // Na primeira leitura, apenas armazena para não spammar vídeos antigos ao ligar o bot
     if (lastVideoId === null) {
