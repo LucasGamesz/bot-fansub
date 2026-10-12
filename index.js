@@ -194,7 +194,7 @@ client.on('interactionCreate', async interaction => {
       }
     }
 
-    const textoCheck = etapaConcluidaRecente ? `✅ **${etapaConcluidaRecente}**` : `✅ **Atualização de Progresso**`;
+    const textoCheck = etapaConcluidaRecente ? `\n✅ **${etapaConcluidaRecente}**` : ``;
 
     // Atualiza o histórico no banco de dados com o estado atual
     db.historico[chaveHistorico] = { ...statusAtuais };
