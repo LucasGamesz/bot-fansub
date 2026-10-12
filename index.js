@@ -179,7 +179,8 @@ client.on('interactionCreate', async interaction => {
     const imagemObra = obraCadastrada ? obraCadastrada.imagem : null;
     const corObra = obraCadastrada ? parseInt(obraCadastrada.cor, 16) : 0x00AE86;
 
-    const descricao = `## ${nomeExibicao}\n### Episódio ${ep} - ${porcentagem}%\n\n✅ **Última etapa concluída:** ${ultimaConcluida}\n\n${tlStatus}  ${edStatus}  ${tsStatus}  ${qcStatus}`;
+    // Ajustado com o pulo de linha (\n) após o episódio/porcentagem e sem o texto fixo
+    const descricao = `## ${nomeExibicao}\n### Episódio ${ep} - ${porcentagem}%\n\n✅ **${ultimaConcluida}**\n\n${tlStatus}  ${edStatus}  ${tsStatus}  ${qcStatus}`;
 
     const embed = new EmbedBuilder()
       .setColor(corObra)
