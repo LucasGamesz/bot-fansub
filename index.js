@@ -184,7 +184,6 @@ client.on('interactionCreate', async interaction => {
       }
     }
 
-    // Se nenhuma mudou mas alguma está feita, pega a primeira feita ou mantém um padrão
     if (!etapaConcluidaRecente) {
       for (const [etapa, val] of Object.entries(statusAtuais)) {
         if (val === 'done') {
@@ -194,7 +193,7 @@ client.on('interactionCreate', async interaction => {
       }
     }
 
-    const textoCheck = etapaConcluidaRecente ? `\n✅ **${etapaConcluidaRecente}**` : ``;
+    const textoCheck = etapaConcluidaRecente ? `✅ **${etapaConcluidaRecente}**` : `✅ **Atualização de Progresso**`;
 
     // Atualiza o histórico no banco de dados com o estado atual
     db.historico[chaveHistorico] = { ...statusAtuais };
@@ -213,11 +212,16 @@ client.on('interactionCreate', async interaction => {
     const imagemObra = obraCadastrada ? obraCadastrada.imagem : null;
     const corObra = obraCadastrada ? parseInt(obraCadastrada.cor, 16) : 0x00AE86;
 
-    const descricao = `## ${nomeExibicao}\n### Episódio ${ep} - ${porcentagem}%\n\n${textoCheck}\n\n${tlStatus}  ${edStatus}  ${tsStatus}  ${qcStatus}`;
+    // Descrição principal contendo apenas o Nome e o Episódio com porcentagem
+    const descricao = `## ${nomeExibicao}\n### Episódio ${ep} - ${porcentagem}%`;
+
+    // Valor do Field combinando a última etapa e as etapas formatadas
+    const fieldValor = `${textoCheck}\n\n${tlStatus}  ${edStatus}  ${tsStatus}  ${qcStatus}`;
 
     const embed = new EmbedBuilder()
       .setColor(corObra)
       .setDescription(descricao)
+      .addFields({ name: '\u200b', value: fieldValor }) // Field customizado
       .setTimestamp();
 
     if (imagemObra) {
