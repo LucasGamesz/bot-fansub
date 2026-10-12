@@ -1,0 +1,12 @@
+{
+  "name": "bot-fansub",
+  "version": "1.0.0",
+  "description": "Bot de progresso para fansub",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.14.0"
+  }
+}
