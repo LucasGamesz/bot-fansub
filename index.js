@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits, ChannelType } = require('discord.js');
 const http = require('http');
 const mongoose = require('mongoose');
 
@@ -6,7 +6,7 @@ const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBit
 
 // --- CONFIGURAÇÕES DISCORD ---
 const GUILD_ID = '1559002627285590026';  
-const PROGRESSO_CHANNEL_ID = '1559007169188331540'; // Substitua pelo ID do canal
+const PROGRESSO_CHANNEL_ID = '1559007169188331540'; // Canal padrão se não especificar um no comando
 
 // --- MODELOS DO MONGODB ---
 const obraSchema = new mongoose.Schema({
@@ -40,11 +40,11 @@ mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('Conectado ao MongoDB com sucesso!'))
   .catch(err => console.error('Erro ao conectar ao MongoDB:', err));
 
-// 1. Definição dos comandos de barra (com os obrigatórios antes dos opcionais)
+// 1. Definição dos comandos de barra (com opções obrigatórias primeiro)
 const commands = [
   new SlashCommandBuilder()
     .setName('cadastrar-obra')
-    .setDescription('Cadastra a obra e envia a ficha técnica completa no canal')
+    .setDescription('Cadastra ou atualiza uma obra e envia a ficha técnica no canal')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addStringOption(option => option.setName('titulo').setDescription('Título principal da obra').setRequired(true))
     .addStringOption(option => option.setName('generos').setDescription('Gêneros (ex: Action, Sci-Fi)').setRequired(true))
@@ -56,7 +56,13 @@ const commands = [
     .addStringOption(option => option.setName('downloads').setDescription('Links de download').setRequired(true))
     .addStringOption(option => option.setName('cor').setDescription('Cor em Hex (Ex: #FF0000 ou FF0000)').setRequired(true))
     .addStringOption(option => option.setName('imagem').setDescription('Link da imagem/capa').setRequired(true))
-    .addStringOption(option => option.setName('titulo_alternativo').setDescription('Título alternativo').setRequired(false)), // Opcional colocado no fim
+    // Opções opcionais no final
+    .addChannelOption(option => 
+      option.setName('canal')
+        .setDescription('Canal onde a ficha técnica será enviada (opcional)')
+        .addChannelTypes(ChannelType.GuildText)
+        .setRequired(false))
+    .addStringOption(option => option.setName('titulo_alternativo').setDescription('Título alternativo').setRequired(false)),
 
   new SlashCommandBuilder()
     .setName('progresso')
@@ -105,7 +111,7 @@ const nomesEtapas = {
 client.on('interactionCreate', async interaction => {
   if (!interaction.isChatInputCommand()) return;
 
-  // --- /CADASTRAR-OBRA: Ficha técnica completa ---
+  // --- /CADASTRAR-OBRA ---
   if (interaction.commandName === 'cadastrar-obra') {
     const titulo = interaction.options.getString('titulo');
     const generos = interaction.options.getString('generos');
@@ -117,6 +123,7 @@ client.on('interactionCreate', async interaction => {
     const downloads = interaction.options.getString('downloads');
     const corInput = interaction.options.getString('cor');
     const imagem = interaction.options.getString('imagem');
+    const canalAlvo = interaction.options.getChannel('canal');
     const tituloAlternativo = interaction.options.getString('titulo_alternativo') || '';
 
     const cleanHex = corInput.replace('#', '');
@@ -141,10 +148,11 @@ client.on('interactionCreate', async interaction => {
       cor: cleanHex
     };
 
-    // Salva no MongoDB
+    // Atualiza se já existir ou cria novo no MongoDB Atlas
+    const obraExistente = await Obra.findOne({ key });
     await Obra.findOneAndUpdate({ key }, obraData, { upsert: true, new: true });
 
-    // Montar o Embed da Ficha Técnica Exato
+    // Montar o Embed da Ficha Técnica
     const embedFicha = new EmbedBuilder()
       .setColor(parseInt(cleanHex, 16))
       .setAuthor({ name: '📺 Nova Obra Cadastrada — Série de TV' })
@@ -163,16 +171,22 @@ client.on('interactionCreate', async interaction => {
       )
       .setTimestamp();
 
-    const canalProgresso = await client.channels.fetch(PROGRESSO_CHANNEL_ID);
-    if (canalProgresso) {
-      await canalProgresso.send({ embeds: [embedFicha] });
-      return interaction.reply({ content: `✅ Ficha técnica de **"${titulo}"** cadastrada e enviada com sucesso!`, ephemeral: true });
+    // Define qual canal usar: o especificado na opção ou o canal padrão hardcoded
+    let canalDestino = canalAlvo;
+    if (!canalDestino) {
+      canalDestino = await client.channels.fetch(PROGRESSO_CHANNEL_ID).catch(() => null);
+    }
+
+    if (canalDestino) {
+      await canalDestino.send({ embeds: [embedFicha] });
+      const acao = obraExistente ? 'atualizada e reenviada' : 'cadastrada e enviada';
+      return interaction.reply({ content: `✅ Ficha técnica de **"${titulo}"** ${acao} com sucesso no canal ${canalDestino}!`, ephemeral: true });
     } else {
-      return interaction.reply({ content: '❌ Canal de progresso não encontrado.', ephemeral: true });
+      return interaction.reply({ content: '❌ Não foi possível encontrar o canal para enviar a mensagem.', ephemeral: true });
     }
   }
 
-  // --- /PROGRESSO: Painel limpo puxando dados da obra cadastrada ---
+  // --- /PROGRESSO ---
   if (interaction.commandName === 'progresso') {
     const nomeObraInput = interaction.options.getString('obra');
     const ep = interaction.options.getInteger('episodio');
@@ -212,7 +226,6 @@ client.on('interactionCreate', async interaction => {
     const tsStatus = statusAtuais.ts === 'done' ? '~~TS~~' : '**TS**';
     const qcStatus = statusAtuais.qc === 'done' ? '~~QC~~' : '**QC**';
 
-    // Puxa a obra do banco de dados para reutilizar a capa e a cor cadastradas
     const obraCadastrada = await Obra.findOne({ key: obraKey });
 
     const nomeExibicao = obraCadastrada ? obraCadastrada.nomeOriginal : nomeObraInput;
@@ -246,7 +259,7 @@ client.on('interactionCreate', async interaction => {
   }
 });
 
-// --- MINI SERVIDOR HTTP PARA O RENDER NÃO DORMIR ---
+// --- MINI SERVIDOR HTTP ---
 const server = http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' });
   res.end('Bot esta online e operando!\n');
