@@ -6,7 +6,7 @@ const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBit
 
 // --- CONFIGURAÇÕES DISCORD ---
 const GUILD_ID = '1559002627285590026';  
-const PROGRESSO_CHANNEL_ID = 'SEU_ID_DO_CANAL_DE_PROGRESSO_AQUI'; // Substitua pelo ID do canal onde o embed será enviado
+const PROGRESSO_CHANNEL_ID = '1559007169188331540'; // Substitua pelo ID do canal onde o embed será enviado
 
 // --- MODELOS DO MONGODB ---
 const obraSchema = new mongoose.Schema({
