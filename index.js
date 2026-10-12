@@ -12,6 +12,14 @@ const PROGRESSO_CHANNEL_ID = 'SEU_ID_DO_CANAL_DE_PROGRESSO_AQUI'; // Substitua p
 const obraSchema = new mongoose.Schema({
   key: { type: String, required: true, unique: true },
   nomeOriginal: { type: String, required: true },
+  tituloAlternativo: { type: String },
+  generos: { type: String },
+  estudios: { type: String },
+  temporada: { type: String },
+  status: { type: String },
+  episodios: { type: String },
+  sinopse: { type: String },
+  downloads: { type: String },
   imagem: { type: String, required: true },
   cor: { type: String, required: true }
 });
@@ -32,18 +40,23 @@ mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('Conectado ao MongoDB com sucesso!'))
   .catch(err => console.error('Erro ao conectar ao MongoDB:', err));
 
-// 1. Definição dos comandos de barra (/cadastrar-obra e /progresso)
+// 1. Definição dos comandos de barra
 const commands = [
   new SlashCommandBuilder()
     .setName('cadastrar-obra')
-    .setDescription('Cadastra uma obra com imagem e cor padrão para usar no progresso')
+    .setDescription('Cadastra uma obra com todos os detalhes e visual completo')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-    .addStringOption(option => 
-      option.setName('nome').setDescription('Nome da obra').setRequired(true))
-    .addStringOption(option => 
-      option.setName('imagem').setDescription('Link da imagem/capa da obra').setRequired(true))
-    .addStringOption(option => 
-      option.setName('cor').setDescription('Cor do embed em Hex (Ex: #FF0000 ou FF0000)').setRequired(true)),
+    .addStringOption(option => option.setName('titulo').setDescription('Título principal da obra').setRequired(true))
+    .addStringOption(option => option.setName('titulo_alternativo').setDescription('Título alternativo').setRequired(false))
+    .addStringOption(option => option.setName('generos').setDescription('Gêneros (ex: Action, Sci-Fi)').setRequired(true))
+    .addStringOption(option => option.setName('estudios').setDescription('Estúdios responsáveis').setRequired(true))
+    .addStringOption(option => option.setName('temporada').setDescription('Temporada e Ano (ex: Primavera/2024)').setRequired(true))
+    .addStringOption(option => option.setName('status').setDescription('Status (ex: Finalizado, Em Lançamento)').setRequired(true))
+    .addStringOption(option => option.setName('episodios').setDescription('Total de episódios').setRequired(true))
+    .addStringOption(option => option.setName('sinopse').setDescription('Sinopse da obra').setRequired(true))
+    .addStringOption(option => option.setName('downloads').setDescription('Links de download').setRequired(true))
+    .addStringOption(option => option.setName('cor').setDescription('Cor em Hex (Ex: #FF0000 ou FF0000)').setRequired(true))
+    .addStringOption(option => option.setName('imagem').setDescription('Link da imagem/capa').setRequired(true)),
 
   new SlashCommandBuilder()
     .setName('progresso')
@@ -82,7 +95,6 @@ client.once('ready', async () => {
   }
 });
 
-// Nomes formatados para exibição das etapas
 const nomesEtapas = {
   tl: 'TL (Tradução)',
   ed: 'ED (Edição)',
@@ -90,30 +102,73 @@ const nomesEtapas = {
   qc: 'QC (Revisão)'
 };
 
-// Manipulador das interações (Comandos)
 client.on('interactionCreate', async interaction => {
   if (!interaction.isChatInputCommand()) return;
 
   // Comando /cadastrar-obra
   if (interaction.commandName === 'cadastrar-obra') {
-    const nome = interaction.options.getString('nome');
-    const imagem = interaction.options.getString('imagem');
+    const titulo = interaction.options.getString('titulo');
+    const tituloAlternativo = interaction.options.getString('titulo_alternativo') || '';
+    const generos = interaction.options.getString('generos');
+    const estudios = interaction.options.getString('estudios');
+    const temporada = interaction.options.getString('temporada');
+    const status = interaction.options.getString('status');
+    const episodios = interaction.options.getString('episodios');
+    const sinopse = interaction.options.getString('sinopse');
+    const downloads = interaction.options.getString('downloads');
     const corInput = interaction.options.getString('cor');
+    const imagem = interaction.options.getString('imagem');
 
     const cleanHex = corInput.replace('#', '');
     if (!/^[0-9A-Fa-f]{6}$/.test(cleanHex)) {
       return interaction.reply({ content: '❌ Cor inválida! Use o formato hexadecimal correto (Ex: `#FF0000` ou `FF0000`).', ephemeral: true });
     }
 
-    const key = nome.toLowerCase();
+    const key = titulo.toLowerCase();
 
-    await Obra.findOneAndUpdate(
-      { key },
-      { key, nomeOriginal: nome, imagem, cor: cleanHex },
-      { upsert: true, new: true }
-    );
+    // Salva ou atualiza no MongoDB
+    const obraData = {
+      key,
+      nomeOriginal: titulo,
+      tituloAlternativo,
+      generos,
+      estudios,
+      temporada,
+      status,
+      episodios,
+      sinopse,
+      downloads,
+      imagem,
+      cor: cleanHex
+    };
 
-    return interaction.reply({ content: `✅ Obra **"${nome}"** cadastrada com sucesso no banco de dados!`, ephemeral: true });
+    await Obra.findOneAndUpdate({ key }, obraData, { upsert: true, new: true });
+
+    // Montar o Embed da obra cadastrada
+    const embed = new EmbedBuilder()
+      .setColor(parseInt(cleanHex, 16))
+      .setAuthor({ name: '📺 Nova Obra Cadastrada — Série de TV' })
+      .setTitle(titulo)
+      .setThumbnail(imagem)
+      .addFields(
+        { name: '📺 Título Alternativo', value: tituloAlternativo || 'N/A', inline: false },
+        { name: '🎭 Gêneros', value: generos, inline: true },
+        { name: '🎨 Estúdio(s)', value: estudios, inline: true },
+        { name: '📅 Temporada/Ano', value: temporada, inline: true },
+        { name: '📊 Status', value: status, inline: true },
+        { name: '🎬 Episódios Totais', value: episodios, inline: true },
+        { name: '📖 SINOPSE', value: sinopse, inline: false },
+        { name: '📦 DOWNLOADS', value: downloads, inline: false }
+      )
+      .setTimestamp();
+
+    const canalProgresso = await client.channels.fetch(PROGRESSO_CHANNEL_ID);
+    if (canalProgresso) {
+      await canalProgresso.send({ embeds: [embed] });
+      return interaction.reply({ content: `✅ Obra **"${titulo}"** cadastrada e enviada para o canal com sucesso!`, ephemeral: true });
+    } else {
+      return interaction.reply({ content: '❌ Canal de progresso não encontrado.', ephemeral: true });
+    }
   }
 
   // Comando /progresso
@@ -162,7 +217,6 @@ client.on('interactionCreate', async interaction => {
     const imagemObra = obraCadastrada ? obraCadastrada.imagem : null;
     const corObra = obraCadastrada ? parseInt(obraCadastrada.cor, 16) : 0x00AE86;
 
-    // Construir a descrição ajustando o espaço acima do check e colado nas etapas
     let descricao = `# ${nomeExibicao}\n### Episódio ${ep} - ${porcentagem}%`;
 
     if (etapaConcluidaRecente) {
@@ -180,13 +234,12 @@ client.on('interactionCreate', async interaction => {
       embed.setThumbnail(imagemObra);
     }
 
-    // Envia o embed de forma limpa no canal configurado e confirma para o usuário de forma privada
     const canalProgresso = await client.channels.fetch(PROGRESSO_CHANNEL_ID);
     if (canalProgresso) {
       await canalProgresso.send({ embeds: [embed] });
-      await interaction.reply({ content: `✅ Progresso de **${nomeExibicao} (Ep. ${ep})** enviado com sucesso para o canal de progresso!`, ephemeral: true });
+      await interaction.reply({ content: `✅ Progresso de **${nomeExibicao} (Ep. ${ep})** enviado com sucesso!`, ephemeral: true });
     } else {
-      await interaction.reply({ content: '❌ Canal de progresso não encontrado. Verifique o ID configurado.', ephemeral: true });
+      await interaction.reply({ content: '❌ Canal de progresso não encontrado.', ephemeral: true });
     }
   }
 });
