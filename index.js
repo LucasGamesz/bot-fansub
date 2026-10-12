@@ -9,7 +9,7 @@ const TRAILERS_CHANNEL_ID = '1559006817470910464';
 const ANISONGS_CHANNEL_ID = '1559006593084035242';
 
 // Insira aqui o ID do seu servidor do Discord para o comando aparecer instantaneamente:
-const GUILD_ID = 'COLOQUE_O_ID_DO_SEU_SERVIDOR_AQUI'; 
+const GUILD_ID = '1559002627285590026'; 
 
 let lastVideoId = null;
 
