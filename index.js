@@ -211,14 +211,14 @@ client.on('interactionCreate', async interaction => {
     const imagemObra = obraCadastrada ? obraCadastrada.imagem : null;
     const corObra = obraCadastrada ? parseInt(obraCadastrada.cor, 16) : 0x00AE86;
 
-    // Construir tudo diretamente na description para evitar espaçamento de fields
-    let descricao = `# ${nomeExibicao}\n### Episódio ${ep} - ${porcentagem}%\n`;
+    // Construir a descrição ajustando o espaço para ficar acima do check e colado nas etapas
+    let descricao = `# ${nomeExibicao}\n### Episódio ${ep} - ${porcentagem}%`;
 
     if (etapaConcluidaRecente) {
-      descricao += `\n✅ **${etapaConcluidaRecente}**\n`;
+      descricao += `\n\n✅ **${etapaConcluidaRecente}**\n${tlStatus}  ${edStatus}  ${tsStatus}  ${qcStatus}`;
+    } else {
+      descricao += `\n\nStatus do episódio ${ep}\n${tlStatus}  ${edStatus}  ${tsStatus}  ${qcStatus}`;
     }
-
-    descricao += `\n${tlStatus}  ${edStatus}  ${tsStatus}  ${qcStatus}`;
 
     const embed = new EmbedBuilder()
       .setColor(corObra)
