@@ -40,7 +40,7 @@ mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('Conectado ao MongoDB com sucesso!'))
   .catch(err => console.error('Erro ao conectar ao MongoDB:', err));
 
-// 1. Definição dos comandos de barra (com opções obrigatórias primeiro)
+// 1. Definição dos comandos de barra (opções obrigatórias primeiro)
 const commands = [
   new SlashCommandBuilder()
     .setName('cadastrar-obra')
@@ -56,7 +56,6 @@ const commands = [
     .addStringOption(option => option.setName('downloads').setDescription('Links de download').setRequired(true))
     .addStringOption(option => option.setName('cor').setDescription('Cor em Hex (Ex: #FF0000 ou FF0000)').setRequired(true))
     .addStringOption(option => option.setName('imagem').setDescription('Link da imagem/capa').setRequired(true))
-    // Opções opcionais no final
     .addChannelOption(option => 
       option.setName('canal')
         .setDescription('Canal onde a ficha técnica será enviada (opcional)')
@@ -85,7 +84,39 @@ const commands = [
         { name: 'Feito (Riscar)', value: 'done' }, { name: 'Pendente (Negrito)', value: 'pending' }))
     .addStringOption(option =>
       option.setName('qc').setDescription('Revisão (QC)').setRequired(true).addChoices(
-        { name: 'Feito (Riscar)', value: 'done' }, { name: 'Pendente (Negrito)', value: 'pending' }))
+        { name: 'Feito (Riscar)', value: 'done' }, { name: 'Pendente (Negrito)', value: 'pending' })),
+
+  new SlashCommandBuilder()
+    .setName('dizer')
+    .setDescription('Faz o bot enviar uma mensagem personalizada no canal')
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    .addStringOption(option => 
+      option.setName('mensagem')
+        .setDescription('O conteúdo da mensagem que o bot vai enviar')
+        .setRequired(true))
+    .addChannelOption(option => 
+      option.setName('canal')
+        .setDescription('Canal onde a mensagem será enviada (opcional)')
+        .addChannelTypes(ChannelType.GuildText)
+        .setRequired(false)),
+
+  new SlashCommandBuilder()
+    .setName('editar')
+    .setDescription('Edita uma mensagem enviada anteriormente pelo bot')
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    .addStringOption(option => 
+      option.setName('id_mensagem')
+        .setDescription('O ID da mensagem do bot que deseja editar')
+        .setRequired(true))
+    .addStringOption(option => 
+      option.setName('conteudo')
+        .setDescription('O novo texto da mensagem')
+        .setRequired(true))
+    .addChannelOption(option => 
+      option.setName('canal')
+        .setDescription('Canal onde a mensagem foi enviada (opcional)')
+        .addChannelTypes(ChannelType.GuildText)
+        .setRequired(false))
 ].map(command => command.toJSON());
 
 client.once('ready', async () => {
@@ -148,17 +179,14 @@ client.on('interactionCreate', async interaction => {
       cor: cleanHex
     };
 
-    // Atualiza se já existir ou cria novo no MongoDB Atlas
     const obraExistente = await Obra.findOne({ key });
     await Obra.findOneAndUpdate({ key }, obraData, { upsert: true, new: true });
 
-    // Montar o Embed da Ficha Técnica
     const embedFicha = new EmbedBuilder()
       .setColor(parseInt(cleanHex, 16))
-      .setDescription(`# ${titulo}`) // Título H1 enorme no topo
+      .setDescription(`# ${titulo}`)
       .setThumbnail(imagem)
       .addFields(
-        // { name: '📺 Título', value: titulo, inline: false },
         ...(tituloAlternativo ? [{ name: '📺 Título Alternativo', value: tituloAlternativo, inline: false }] : []),
         { name: '🎭 Gêneros', value: generos, inline: true },
         { name: '🎨 Estúdio(s)', value: estudios, inline: true },
@@ -170,7 +198,6 @@ client.on('interactionCreate', async interaction => {
       )
       .setTimestamp();
 
-    // Define qual canal usar: o especificado na opção ou o canal padrão hardcoded
     let canalDestino = canalAlvo;
     if (!canalDestino) {
       canalDestino = await client.channels.fetch(PROGRESSO_CHANNEL_ID).catch(() => null);
@@ -254,6 +281,50 @@ client.on('interactionCreate', async interaction => {
       await interaction.reply({ content: `✅ Progresso de **${nomeExibicao} (Ep. ${ep})** enviado com sucesso!`, ephemeral: true });
     } else {
       await interaction.reply({ content: '❌ Canal de progresso não encontrado.', ephemeral: true });
+    }
+  }
+
+  // --- /DIZER ---
+  if (interaction.commandName === 'dizer') {
+    const conteudo = interaction.options.getString('mensagem');
+    const canalAlvo = interaction.options.getChannel('canal') || interaction.channel;
+
+    try {
+      await canalAlvo.send(conteudo);
+      return interaction.reply({ 
+        content: `✅ Mensagem enviada com sucesso no canal ${canalAlvo}!`, 
+        ephemeral: true 
+      });
+    } catch (error) {
+      console.error('Erro ao executar /dizer:', error);
+      return interaction.reply({ 
+        content: '❌ Não foi possível enviar a mensagem nesse canal. Verifique as permissões do bot.', 
+        ephemeral: true 
+      });
+    }
+  }
+
+  // --- /EDITAR ---
+  if (interaction.commandName === 'editar') {
+    const messageId = interaction.options.getString('id_mensagem');
+    const novoConteudo = interaction.options.getString('conteudo');
+    const canalAlvo = interaction.options.getChannel('canal') || interaction.channel;
+
+    try {
+      const mensagem = await canalAlvo.messages.fetch(messageId);
+      if (!mensagem) {
+        return interaction.reply({ content: '❌ Mensagem não encontrada no canal especificado.', ephemeral: true });
+      }
+
+      if (mensagem.author.id !== client.user.id) {
+        return interaction.reply({ content: '❌ O bot só pode editar mensagens enviadas por ele mesmo.', ephemeral: true });
+      }
+
+      await mensagem.edit(novoConteudo);
+      return interaction.reply({ content: `✅ Mensagem editada com sucesso no canal ${canalAlvo}!`, ephemeral: true });
+    } catch (error) {
+      console.error('Erro ao executar /editar:', error);
+      return interaction.reply({ content: '❌ Erro ao tentar editar a mensagem. Verifique se o ID está correto e se o bot tem acesso ao canal.', ephemeral: true });
     }
   }
 });
