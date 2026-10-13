@@ -155,8 +155,7 @@ client.on('interactionCreate', async interaction => {
     // Montar o Embed da Ficha Técnica
     const embedFicha = new EmbedBuilder()
       .setColor(parseInt(cleanHex, 16))
-      .setAuthor({ name: '' })
-      .setTitle('# ' + titulo)
+      .setDescription(`# ${titulo}`) // Título H1 enorme no topo
       .setThumbnail(imagem)
       .addFields(
         { name: '📺 Título', value: titulo, inline: false },
