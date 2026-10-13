@@ -155,8 +155,8 @@ client.on('interactionCreate', async interaction => {
     // Montar o Embed da Ficha Técnica
     const embedFicha = new EmbedBuilder()
       .setColor(parseInt(cleanHex, 16))
-      .setAuthor({ name: '📺 Nova Obra Cadastrada — Série de TV' })
-      .setTitle(titulo)
+      .setAuthor({ name: '' })
+      .setTitle('# ' + titulo)
       .setThumbnail(imagem)
       .addFields(
         { name: '📺 Título', value: titulo, inline: false },
