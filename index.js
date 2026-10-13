@@ -158,7 +158,7 @@ client.on('interactionCreate', async interaction => {
       .setDescription(`# ${titulo}`) // Título H1 enorme no topo
       .setThumbnail(imagem)
       .addFields(
-        { name: '📺 Título', value: titulo, inline: false },
+        // { name: '📺 Título', value: titulo, inline: false },
         ...(tituloAlternativo ? [{ name: '📺 Título Alternativo', value: tituloAlternativo, inline: false }] : []),
         { name: '🎭 Gêneros', value: generos, inline: true },
         { name: '🎨 Estúdio(s)', value: estudios, inline: true },
