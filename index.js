@@ -1,21 +1,24 @@
+const dns = require('dns');
+dns.setDefaultResultOrder('ipv4first'); // <--- ESSA LINHA RESOLVE O TRAVAMENTO NO RENDER
+
 const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits, ChannelType } = require('discord.js');
 const http = require('http');
 const mongoose = require('mongoose');
 
-const client = new Client({ intents: [GatewayIntentBits.Guilds] });
-
-// Ativa logs detalhados de tudo o que o Discord.js tenta fazer na rede
-client.on('debug', info => console.log('🔍 [DEBUG Discord]:', info));
-client.on('warn', info => console.log('⚠️ [WARN Discord]:', info));
-client.on('error', error => console.error('❌ [ERRO Discord]:', error));
-
-// Captura erros críticos não tratados para exibir nos logs
+// Captura erros críticos não tratados
 process.on('unhandledRejection', error => {
   console.error('❌ Unhandled Rejection:', error);
 });
 process.on('uncaughtException', error => {
   console.error('❌ Uncaught Exception:', error);
 });
+
+const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+
+// Logs de depuração do Discord
+client.on('debug', info => console.log('🔍 [DEBUG Discord]:', info));
+client.on('warn', info => console.log('⚠️ [WARN Discord]:', info));
+client.on('error', error => console.error('❌ [ERRO Discord]:', error));
 
 // --- CONFIGURAÇÕES DISCORD ---
 const GUILD_ID = '1559002627285590026';  
@@ -266,7 +269,8 @@ client.on('interactionCreate', async interaction => {
 
       const tlStatus = statusAtuais.tl === 'done' ? '~~TL~~' : '**TL**';
       const edStatus = statusAtuais.ed === 'done' ? '~~ED~~' : '**ED**';
-      const tsStatus = statusAtuais.ts === 'done' ? '~~TS~~' : '**TS**';
+      const tsStatus = statusAtuserInput => statusAtuais.ts === 'done' ? '~~TS~~' : '**TS**';
+      const tsStatusStr = statusAtuais.ts === 'done' ? '~~TS~~' : '**TS**';
       const qcStatus = statusAtuais.qc === 'done' ? '~~QC~~' : '**QC**';
 
       const obraCadastrada = await Obra.findOne({ key: obraKey });
@@ -278,9 +282,9 @@ client.on('interactionCreate', async interaction => {
       let descricao = `# ${nomeExibicao}\n### Episódio ${ep} - ${porcentagem}%`;
 
       if (etapaConcluidaRecente) {
-        descricao += `\n\n✅ **${etapaConcluidaRecente}**\n${tlStatus}  ${edStatus}  ${tsStatus}  ${qcStatus}`;
+        descricao += `\n\n✅ **${etapaConcluidaRecente}**\n${tlStatus}  ${edStatus}  ${tsStatusStr}  ${qcStatus}`;
       } else {
-        descricao += `\n\n${tlStatus}  ${edStatus}  ${tsStatus}  ${qcStatus}`;
+        descricao += `\n\n${tlStatus}  ${edStatus}  ${tsStatusStr}  ${qcStatus}`;
       }
 
       const embedProgresso = new EmbedBuilder()
@@ -350,7 +354,7 @@ server.listen(PORT, () => {
   console.log(`🌐 Servidor HTTP rodando na porta ${PORT}`);
 });
 
-// --- TENTATIVA DE LOGIN COM TRATAMENTO DE ERRO ---
+// --- LOGIN NO DISCORD ---
 console.log('🔄 A tentar efetuar login no Discord...');
 client.login(process.env.TOKEN)
   .then(() => console.log('✅ Login no Discord executado com sucesso!'))
