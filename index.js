@@ -142,6 +142,9 @@ const nomesEtapas = {
 client.on('interactionCreate', async interaction => {
   if (!interaction.isChatInputCommand()) return;
 
+  // Evita o erro de timeout de 3 segundos do Discord em qualquer comando
+  await interaction.deferReply({ ephemeral: true });
+
   // --- /CADASTRAR-OBRA ---
   if (interaction.commandName === 'cadastrar-obra') {
     const titulo = interaction.options.getString('titulo');
@@ -159,7 +162,7 @@ client.on('interactionCreate', async interaction => {
 
     const cleanHex = corInput.replace('#', '');
     if (!/^[0-9A-Fa-f]{6}$/.test(cleanHex)) {
-      return interaction.reply({ content: '❌ Cor inválida! Use o formato hexadecimal correto (Ex: `#FF0000` ou `FF0000`).', ephemeral: true });
+      return interaction.editReply({ content: '❌ Cor inválida! Use o formato hexadecimal correto (Ex: `#FF0000` ou `FF0000`).' });
     }
 
     const key = titulo.toLowerCase();
@@ -206,9 +209,9 @@ client.on('interactionCreate', async interaction => {
     if (canalDestino) {
       await canalDestino.send({ embeds: [embedFicha] });
       const acao = obraExistente ? 'atualizada e reenviada' : 'cadastrada e enviada';
-      return interaction.reply({ content: `✅ Ficha técnica de **"${titulo}"** ${acao} com sucesso no canal ${canalDestino}!`, ephemeral: true });
+      return interaction.editReply({ content: `✅ Ficha técnica de **"${titulo}"** ${acao} com sucesso no canal ${canalDestino}!` });
     } else {
-      return interaction.reply({ content: '❌ Não foi possível encontrar o canal para enviar a mensagem.', ephemeral: true });
+      return interaction.editReply({ content: '❌ Não foi possível encontrar o canal para enviar a mensagem.' });
     }
   }
 
@@ -278,9 +281,9 @@ client.on('interactionCreate', async interaction => {
     const canalProgresso = await client.channels.fetch(PROGRESSO_CHANNEL_ID);
     if (canalProgresso) {
       await canalProgresso.send({ embeds: [embedProgresso] });
-      await interaction.reply({ content: `✅ Progresso de **${nomeExibicao} (Ep. ${ep})** enviado com sucesso!`, ephemeral: true });
+      return interaction.editReply({ content: `✅ Progresso de **${nomeExibicao} (Ep. ${ep})** enviado com sucesso!` });
     } else {
-      await interaction.reply({ content: '❌ Canal de progresso não encontrado.', ephemeral: true });
+      return interaction.editReply({ content: '❌ Canal de progresso não encontrado.' });
     }
   }
 
@@ -291,16 +294,10 @@ client.on('interactionCreate', async interaction => {
 
     try {
       await canalAlvo.send(conteudo);
-      return interaction.reply({ 
-        content: `✅ Mensagem enviada com sucesso no canal ${canalAlvo}!`, 
-        ephemeral: true 
-      });
+      return interaction.editReply({ content: `✅ Mensagem enviada com sucesso no canal ${canalAlvo}!` });
     } catch (error) {
       console.error('Erro ao executar /dizer:', error);
-      return interaction.reply({ 
-        content: '❌ Não foi possível enviar a mensagem nesse canal. Verifique as permissões do bot.', 
-        ephemeral: true 
-      });
+      return interaction.editReply({ content: '❌ Não foi possível enviar a mensagem nesse canal. Verifique as permissões do bot.' });
     }
   }
 
@@ -313,18 +310,18 @@ client.on('interactionCreate', async interaction => {
     try {
       const mensagem = await canalAlvo.messages.fetch(messageId);
       if (!mensagem) {
-        return interaction.reply({ content: '❌ Mensagem não encontrada no canal especificado.', ephemeral: true });
+        return interaction.editReply({ content: '❌ Mensagem não encontrada no canal especificado.' });
       }
 
       if (mensagem.author.id !== client.user.id) {
-        return interaction.reply({ content: '❌ O bot só pode editar mensagens enviadas por ele mesmo.', ephemeral: true });
+        return interaction.editReply({ content: '❌ O bot só pode editar mensagens enviadas por ele mesmo.' });
       }
 
       await mensagem.edit(novoConteudo);
-      return interaction.reply({ content: `✅ Mensagem editada com sucesso no canal ${canalAlvo}!`, ephemeral: true });
+      return interaction.editReply({ content: `✅ Mensagem editada com sucesso no canal ${canalAlvo}!` });
     } catch (error) {
       console.error('Erro ao executar /editar:', error);
-      return interaction.reply({ content: '❌ Erro ao tentar editar a mensagem. Verifique se o ID está correto e se o bot tem acesso ao canal.', ephemeral: true });
+      return interaction.editReply({ content: '❌ Erro ao tentar editar a mensagem. Verifique se o ID está correto e se o bot tem acesso ao canal.' });
     }
   }
 });
