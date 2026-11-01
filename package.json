@@ -6,6 +6,9 @@
   "scripts": {
     "start": "node index.js"
   },
+  "engines": {
+    "node": "20.x"
+  },
   "dependencies": {
     "discord.js": "^14.14.0",
     "rss-parser": "^3.13.0",
