@@ -2,6 +2,13 @@ const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuild
 const http = require('http');
 const mongoose = require('mongoose');
 
+const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+
+// Ativa logs detalhados de tudo o que o Discord.js tenta fazer na rede
+client.on('debug', info => console.log('🔍 [DEBUG Discord]:', info));
+client.on('warn', info => console.log('⚠️ [WARN Discord]:', info));
+client.on('error', error => console.error('❌ [ERRO Discord]:', error));
+
 // Captura erros críticos não tratados para exibir nos logs
 process.on('unhandledRejection', error => {
   console.error('❌ Unhandled Rejection:', error);
@@ -9,8 +16,6 @@ process.on('unhandledRejection', error => {
 process.on('uncaughtException', error => {
   console.error('❌ Uncaught Exception:', error);
 });
-
-const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
 // --- CONFIGURAÇÕES DISCORD ---
 const GUILD_ID = '1559002627285590026';  
