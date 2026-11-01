@@ -2,7 +2,8 @@ const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuild
 const http = require('http');
 const mongoose = require('mongoose');
 
-const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages] });
+// Apenas o intent de Guilds é necessário para Slash Commands e canais
+const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
 // --- CONFIGURAÇÕES DISCORD ---
 const GUILD_ID = '1559002627285590026';  
@@ -143,7 +144,6 @@ client.on('interactionCreate', async interaction => {
   if (!interaction.isChatInputCommand()) return;
 
   try {
-    // Adia a resposta imediatamente para evitar timeout de 3 segundos
     await interaction.deferReply({ ephemeral: true });
 
     // --- /CADASTRAR-OBRA ---
@@ -322,9 +322,7 @@ client.on('interactionCreate', async interaction => {
       if (interaction.deferred || interaction.replied) {
         await interaction.editReply({ content: `❌ Ocorreu um erro interno ao executar o comando: \`${error.message}\`` });
       }
-    } catch (e) {
-      // Ignora falhas secundárias caso a interação já tenha expirado totalmente
-    }
+    } catch (e) {}
   }
 });
 
