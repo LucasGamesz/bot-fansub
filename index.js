@@ -6,7 +6,7 @@ const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBit
 
 // --- CONFIGURAÇÕES DISCORD ---
 const GUILD_ID = '1559002627285590026';  
-const PROGRESSO_CHANNEL_ID = '1559007169188331540'; // Canal padrão se não especificar um no comando
+const PROGRESSO_CHANNEL_ID = '1559007169188331540'; // Canal padrão
 
 // --- MODELOS DO MONGODB ---
 const obraSchema = new mongoose.Schema({
@@ -40,7 +40,7 @@ mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('Conectado ao MongoDB com sucesso!'))
   .catch(err => console.error('Erro ao conectar ao MongoDB:', err));
 
-// 1. Definição dos comandos de barra (opções obrigatórias primeiro)
+// 1. Definição dos comandos de barra
 const commands = [
   new SlashCommandBuilder()
     .setName('cadastrar-obra')
@@ -142,172 +142,167 @@ const nomesEtapas = {
 client.on('interactionCreate', async interaction => {
   if (!interaction.isChatInputCommand()) return;
 
-  // Evita o erro de timeout de 3 segundos do Discord em qualquer comando
-  await interaction.deferReply({ ephemeral: true });
+  try {
+    // Adia a resposta imediatamente para evitar timeout de 3 segundos
+    await interaction.deferReply({ ephemeral: true });
 
-  // --- /CADASTRAR-OBRA ---
-  if (interaction.commandName === 'cadastrar-obra') {
-    const titulo = interaction.options.getString('titulo');
-    const generos = interaction.options.getString('generos');
-    const estudios = interaction.options.getString('estudios');
-    const temporada = interaction.options.getString('temporada');
-    const status = interaction.options.getString('status');
-    const episodios = interaction.options.getString('episodios');
-    const sinopse = interaction.options.getString('sinopse');
-    const downloads = interaction.options.getString('downloads');
-    const corInput = interaction.options.getString('cor');
-    const imagem = interaction.options.getString('imagem');
-    const canalAlvo = interaction.options.getChannel('canal');
-    const tituloAlternativo = interaction.options.getString('titulo_alternativo') || '';
+    // --- /CADASTRAR-OBRA ---
+    if (interaction.commandName === 'cadastrar-obra') {
+      const titulo = interaction.options.getString('titulo');
+      const generos = interaction.options.getString('generos');
+      const estudios = interaction.options.getString('estudios');
+      const temporada = interaction.options.getString('temporada');
+      const status = interaction.options.getString('status');
+      const episodios = interaction.options.getString('episodios');
+      const sinopse = interaction.options.getString('sinopse');
+      const downloads = interaction.options.getString('downloads');
+      const corInput = interaction.options.getString('cor');
+      const imagem = interaction.options.getString('imagem');
+      const canalAlvo = interaction.options.getChannel('canal');
+      const tituloAlternativo = interaction.options.getString('titulo_alternativo') || '';
 
-    const cleanHex = corInput.replace('#', '');
-    if (!/^[0-9A-Fa-f]{6}$/.test(cleanHex)) {
-      return interaction.editReply({ content: '❌ Cor inválida! Use o formato hexadecimal correto (Ex: `#FF0000` ou `FF0000`).' });
-    }
+      const cleanHex = corInput.replace('#', '');
+      if (!/^[0-9A-Fa-f]{6}$/.test(cleanHex)) {
+        return interaction.editReply({ content: '❌ Cor inválida! Use o formato hexadecimal correto (Ex: `#FF0000` ou `FF0000`).' });
+      }
 
-    const key = titulo.toLowerCase();
+      const key = titulo.toLowerCase();
 
-    const obraData = {
-      key,
-      nomeOriginal: titulo,
-      tituloAlternativo,
-      generos,
-      estudios,
-      temporada,
-      status,
-      episodios,
-      sinopse,
-      downloads,
-      imagem,
-      cor: cleanHex
-    };
+      const obraData = {
+        key,
+        nomeOriginal: titulo,
+        tituloAlternativo,
+        generos,
+        estudios,
+        temporada,
+        status,
+        episodios,
+        sinopse,
+        downloads,
+        imagem,
+        cor: cleanHex
+      };
 
-    const obraExistente = await Obra.findOne({ key });
-    await Obra.findOneAndUpdate({ key }, obraData, { upsert: true, new: true });
+      const obraExistente = await Obra.findOne({ key });
+      await Obra.findOneAndUpdate({ key }, obraData, { upsert: true, new: true });
 
-    const embedFicha = new EmbedBuilder()
-      .setColor(parseInt(cleanHex, 16))
-      .setDescription(`# ${titulo}`)
-      .setThumbnail(imagem)
-      .addFields(
-        ...(tituloAlternativo ? [{ name: '📺 Título Alternativo', value: tituloAlternativo, inline: false }] : []),
-        { name: '🎭 Gêneros', value: generos, inline: true },
-        { name: '🎨 Estúdio(s)', value: estudios, inline: true },
-        { name: '📅 Temporada/Ano', value: temporada, inline: true },
-        { name: '📊 Status', value: status, inline: true },
-        { name: '🎬 Episódios Totais', value: episodios, inline: true },
-        { name: '📖 SINOPSE', value: sinopse, inline: false },
-        { name: '📦 DOWNLOADS', value: downloads, inline: false }
-      )
-      .setTimestamp();
+      const embedFicha = new EmbedBuilder()
+        .setColor(parseInt(cleanHex, 16))
+        .setDescription(`# ${titulo}`)
+        .setThumbnail(imagem)
+        .addFields(
+          ...(tituloAlternativo ? [{ name: '📺 Título Alternativo', value: tituloAlternativo, inline: false }] : []),
+          { name: '🎭 Gêneros', value: generos, inline: true },
+          { name: '🎨 Estúdio(s)', value: estudios, inline: true },
+          { name: '📅 Temporada/Ano', value: temporada, inline: true },
+          { name: '📊 Status', value: status, inline: true },
+          { name: '🎬 Episódios Totais', value: episodios, inline: true },
+          { name: '📖 SINOPSE', value: sinopse, inline: false },
+          { name: '📦 DOWNLOADS', value: downloads, inline: false }
+        )
+        .setTimestamp();
 
-    let canalDestino = canalAlvo;
-    if (!canalDestino) {
-      canalDestino = await client.channels.fetch(PROGRESSO_CHANNEL_ID).catch(() => null);
-    }
+      let canalDestino = canalAlvo;
+      if (!canalDestino) {
+        canalDestino = await client.channels.fetch(PROGRESSO_CHANNEL_ID).catch(() => null);
+      }
 
-    if (canalDestino) {
-      await canalDestino.send({ embeds: [embedFicha] });
-      const acao = obraExistente ? 'atualizada e reenviada' : 'cadastrada e enviada';
-      return interaction.editReply({ content: `✅ Ficha técnica de **"${titulo}"** ${acao} com sucesso no canal ${canalDestino}!` });
-    } else {
-      return interaction.editReply({ content: '❌ Não foi possível encontrar o canal para enviar a mensagem.' });
-    }
-  }
-
-  // --- /PROGRESSO ---
-  if (interaction.commandName === 'progresso') {
-    const nomeObraInput = interaction.options.getString('obra');
-    const ep = interaction.options.getInteger('episodio');
-    const porcentagem = interaction.options.getInteger('porcentagem');
-
-    const statusAtuais = {
-      tl: interaction.options.getString('tl'),
-      ed: interaction.options.getString('ed'),
-      ts: interaction.options.getString('ts'),
-      qc: interaction.options.getString('qc')
-    };
-
-    const obraKey = nomeObraInput.toLowerCase();
-    const chaveHistorico = `${obraKey}_ep_${ep}`;
-
-    let ultimoEstado = await Historico.findOne({ key: chaveHistorico });
-    if (!ultimoEstado) {
-      ultimoEstado = { tl: 'pending', ed: 'pending', ts: 'pending', qc: 'pending' };
-    }
-
-    let etapaConcluidaRecente = null;
-    for (const [etapa, val] of Object.entries(statusAtuais)) {
-      if (val === 'done' && ultimoEstado[etapa] === 'pending') {
-        etapaConcluidaRecente = nomesEtapas[etapa];
-        break;
+      if (canalDestino) {
+        await canalDestino.send({ embeds: [embedFicha] });
+        const acao = obraExistente ? 'atualizada e reenviada' : 'cadastrada e enviada';
+        return interaction.editReply({ content: `✅ Ficha técnica de **"${titulo}"** ${acao} com sucesso no canal ${canalDestino}!` });
+      } else {
+        return interaction.editReply({ content: '❌ Não foi possível encontrar o canal para enviar a mensagem.' });
       }
     }
 
-    await Historico.findOneAndUpdate(
-      { key: chaveHistorico },
-      { key: chaveHistorico, ...statusAtuais },
-      { upsert: true, new: true }
-    );
+    // --- /PROGRESSO ---
+    if (interaction.commandName === 'progresso') {
+      const nomeObraInput = interaction.options.getString('obra');
+      const ep = interaction.options.getInteger('episodio');
+      const porcentagem = interaction.options.getInteger('porcentagem');
 
-    const tlStatus = statusAtuais.tl === 'done' ? '~~TL~~' : '**TL**';
-    const edStatus = statusAtuais.ed === 'done' ? '~~ED~~' : '**ED**';
-    const tsStatus = statusAtuais.ts === 'done' ? '~~TS~~' : '**TS**';
-    const qcStatus = statusAtuais.qc === 'done' ? '~~QC~~' : '**QC**';
+      const statusAtuais = {
+        tl: interaction.options.getString('tl'),
+        ed: interaction.options.getString('ed'),
+        ts: interaction.options.getString('ts'),
+        qc: interaction.options.getString('qc')
+      };
 
-    const obraCadastrada = await Obra.findOne({ key: obraKey });
+      const obraKey = nomeObraInput.toLowerCase();
+      const chaveHistorico = `${obraKey}_ep_${ep}`;
 
-    const nomeExibicao = obraCadastrada ? obraCadastrada.nomeOriginal : nomeObraInput;
-    const imagemObra = obraCadastrada ? obraCadastrada.imagem : null;
-    const corObra = obraCadastrada ? parseInt(obraCadastrada.cor, 16) : 0x00AE86;
+      let ultimoEstado = await Historico.findOne({ key: chaveHistorico });
+      if (!ultimoEstado) {
+        ultimoEstado = { tl: 'pending', ed: 'pending', ts: 'pending', qc: 'pending' };
+      }
 
-    let descricao = `# ${nomeExibicao}\n### Episódio ${ep} - ${porcentagem}%`;
+      let etapaConcluidaRecente = null;
+      for (const [etapa, val] of Object.entries(statusAtuais)) {
+        if (val === 'done' && ultimoEstado[etapa] === 'pending') {
+          etapaConcluidaRecente = nomesEtapas[etapa];
+          break;
+        }
+      }
 
-    if (etapaConcluidaRecente) {
-      descricao += `\n\n✅ **${etapaConcluidaRecente}**\n${tlStatus}  ${edStatus}  ${tsStatus}  ${qcStatus}`;
-    } else {
-      descricao += `\n\n${tlStatus}  ${edStatus}  ${tsStatus}  ${qcStatus}`;
+      await Historico.findOneAndUpdate(
+        { key: chaveHistorico },
+        { key: chaveHistorico, ...statusAtuais },
+        { upsert: true, new: true }
+      );
+
+      const tlStatus = statusAtuais.tl === 'done' ? '~~TL~~' : '**TL**';
+      const edStatus = statusAtuais.ed === 'done' ? '~~ED~~' : '**ED**';
+      const tsStatus = statusAtuais.ts === 'done' ? '~~TS~~' : '**TS**';
+      const qcStatus = statusAtuais.qc === 'done' ? '~~QC~~' : '**QC**';
+
+      const obraCadastrada = await Obra.findOne({ key: obraKey });
+
+      const nomeExibicao = obraCadastrada ? obraCadastrada.nomeOriginal : nomeObraInput;
+      const imagemObra = obraCadastrada ? obraCadastrada.imagem : null;
+      const corObra = obraCadastrada ? parseInt(obraCadastrada.cor, 16) : 0x00AE86;
+
+      let descricao = `# ${nomeExibicao}\n### Episódio ${ep} - ${porcentagem}%`;
+
+      if (etapaConcluidaRecente) {
+        descricao += `\n\n✅ **${etapaConcluidaRecente}**\n${tlStatus}  ${edStatus}  ${tsStatus}  ${qcStatus}`;
+      } else {
+        descricao += `\n\n${tlStatus}  ${edStatus}  ${tsStatus}  ${qcStatus}`;
+      }
+
+      const embedProgresso = new EmbedBuilder()
+        .setColor(corObra)
+        .setDescription(descricao)
+        .setTimestamp();
+
+      if (imagemObra) {
+        embedProgresso.setThumbnail(imagemObra);
+      }
+
+      const canalProgresso = await client.channels.fetch(PROGRESSO_CHANNEL_ID);
+      if (canalProgresso) {
+        await canalProgresso.send({ embeds: [embedProgresso] });
+        return interaction.editReply({ content: `✅ Progresso de **${nomeExibicao} (Ep. ${ep})** enviado com sucesso!` });
+      } else {
+        return interaction.editReply({ content: '❌ Canal de progresso não encontrado.' });
+      }
     }
 
-    const embedProgresso = new EmbedBuilder()
-      .setColor(corObra)
-      .setDescription(descricao)
-      .setTimestamp();
+    // --- /DIZER ---
+    if (interaction.commandName === 'dizer') {
+      const conteudo = interaction.options.getString('mensagem');
+      const canalAlvo = interaction.options.getChannel('canal') || interaction.channel;
 
-    if (imagemObra) {
-      embedProgresso.setThumbnail(imagemObra);
-    }
-
-    const canalProgresso = await client.channels.fetch(PROGRESSO_CHANNEL_ID);
-    if (canalProgresso) {
-      await canalProgresso.send({ embeds: [embedProgresso] });
-      return interaction.editReply({ content: `✅ Progresso de **${nomeExibicao} (Ep. ${ep})** enviado com sucesso!` });
-    } else {
-      return interaction.editReply({ content: '❌ Canal de progresso não encontrado.' });
-    }
-  }
-
-  // --- /DIZER ---
-  if (interaction.commandName === 'dizer') {
-    const conteudo = interaction.options.getString('mensagem');
-    const canalAlvo = interaction.options.getChannel('canal') || interaction.channel;
-
-    try {
       await canalAlvo.send(conteudo);
       return interaction.editReply({ content: `✅ Mensagem enviada com sucesso no canal ${canalAlvo}!` });
-    } catch (error) {
-      console.error('Erro ao executar /dizer:', error);
-      return interaction.editReply({ content: '❌ Não foi possível enviar a mensagem nesse canal. Verifique as permissões do bot.' });
     }
-  }
 
-  // --- /EDITAR ---
-  if (interaction.commandName === 'editar') {
-    const messageId = interaction.options.getString('id_mensagem');
-    const novoConteudo = interaction.options.getString('conteudo');
-    const canalAlvo = interaction.options.getChannel('canal') || interaction.channel;
+    // --- /EDITAR ---
+    if (interaction.commandName === 'editar') {
+      const messageId = interaction.options.getString('id_mensagem');
+      const novoConteudo = interaction.options.getString('conteudo');
+      const canalAlvo = interaction.options.getChannel('canal') || interaction.channel;
 
-    try {
       const mensagem = await canalAlvo.messages.fetch(messageId);
       if (!mensagem) {
         return interaction.editReply({ content: '❌ Mensagem não encontrada no canal especificado.' });
@@ -319,9 +314,16 @@ client.on('interactionCreate', async interaction => {
 
       await mensagem.edit(novoConteudo);
       return interaction.editReply({ content: `✅ Mensagem editada com sucesso no canal ${canalAlvo}!` });
-    } catch (error) {
-      console.error('Erro ao executar /editar:', error);
-      return interaction.editReply({ content: '❌ Erro ao tentar editar a mensagem. Verifique se o ID está correto e se o bot tem acesso ao canal.' });
+    }
+
+  } catch (error) {
+    console.error('❌ Erro ao processar comando:', error);
+    try {
+      if (interaction.deferred || interaction.replied) {
+        await interaction.editReply({ content: `❌ Ocorreu um erro interno ao executar o comando: \`${error.message}\`` });
+      }
+    } catch (e) {
+      // Ignora falhas secundárias caso a interação já tenha expirado totalmente
     }
   }
 });
