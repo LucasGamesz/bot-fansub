@@ -2,7 +2,14 @@ const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuild
 const http = require('http');
 const mongoose = require('mongoose');
 
-// Apenas o intent de Guilds é necessário para Slash Commands e canais
+// Captura erros críticos não tratados para exibir nos logs
+process.on('unhandledRejection', error => {
+  console.error('❌ Unhandled Rejection:', error);
+});
+process.on('uncaughtException', error => {
+  console.error('❌ Uncaught Exception:', error);
+});
+
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
 // --- CONFIGURAÇÕES DISCORD ---
@@ -37,9 +44,10 @@ const Obra = mongoose.model('Obra', obraSchema);
 const Historico = mongoose.model('Historico', historicoSchema);
 
 // --- CONEXÃO AO MONGODB ---
+console.log('🔄 A tentar conectar ao MongoDB...');
 mongoose.connect(process.env.MONGODB_URI)
-  .then(() => console.log('Conectado ao MongoDB com sucesso!'))
-  .catch(err => console.error('Erro ao conectar ao MongoDB:', err));
+  .then(() => console.log('✅ Conectado ao MongoDB com sucesso!'))
+  .catch(err => console.error('❌ Erro ao conectar ao MongoDB:', err));
 
 // 1. Definição dos comandos de barra
 const commands = [
@@ -121,15 +129,15 @@ const commands = [
 ].map(command => command.toJSON());
 
 client.once('ready', async () => {
-  console.log(`Bot online como ${client.user.tag}!`);
+  console.log(`🤖 Bot online como ${client.user.tag}!`);
   
   const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
   try {
     await rest.put(Routes.applicationCommands(client.user.id), { body: [] });
     await rest.put(Routes.applicationGuildCommands(client.user.id, GUILD_ID), { body: commands });
-    console.log('Comandos de barra limpos e registrados com sucesso!');
+    console.log('✨ Comandos de barra limpos e registrados com sucesso!');
   } catch (error) {
-    console.error('Erro ao registrar comandos:', error);
+    console.error('❌ Erro ao registrar comandos:', error);
   }
 });
 
@@ -334,7 +342,13 @@ const server = http.createServer((req, res) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`Servidor HTTP rodando na porta ${PORT}`);
+  console.log(`🌐 Servidor HTTP rodando na porta ${PORT}`);
 });
 
-client.login(process.env.TOKEN);
+// --- TENTATIVA DE LOGIN COM TRATAMENTO DE ERRO ---
+console.log('🔄 A tentar efetuar login no Discord...');
+client.login(process.env.TOKEN)
+  .then(() => console.log('✅ Login no Discord executado com sucesso!'))
+  .catch(err => {
+    console.error('❌ ERRO CRÍTICO AO FAZER LOGIN NO DISCORD:', err);
+  });
